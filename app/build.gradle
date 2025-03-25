@@ -4,12 +4,12 @@ plugins {
 
 android {
     namespace 'com.bewil.besms'
-    compileSdk 35
+    compileSdk 34
 
     defaultConfig {
         applicationId "com.bewil.besms"
         minSdk 33
-        targetSdk 35
+        targetSdk 34
         versionCode 1
         versionName "1.0"
 
