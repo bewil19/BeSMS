@@ -28,9 +28,12 @@ public class MyForegroundService extends Service {
     private Runnable runnable;
     private long startTime;
 
+    private static boolean isServiceRunning = false;
+
     @Override
     public void onCreate() {
         super.onCreate();
+        isServiceRunning = true;
         startTime = System.currentTimeMillis();
         createNotificationChannel();
 
@@ -55,7 +58,8 @@ public class MyForegroundService extends Service {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         startForeground(NOTIFICATION_ID, getNotification("Service Starting..."));
-        return START_STICKY;
+        updateNotification("Service Restarted");
+        return START_REDELIVER_INTENT;
     }
 
     private void saveLog(String logEntry) {
@@ -71,6 +75,7 @@ public class MyForegroundService extends Service {
         String logs = sharedPreferences.getString(LOGS_KEY, "");
 
         Intent intent = new Intent("ServiceLogUpdate");
+        intent.setPackage(getPackageName());
         intent.putExtra("logs", logs);
         sendBroadcast(intent);
     }
@@ -86,6 +91,7 @@ public class MyForegroundService extends Service {
                 .setContentText(text)
                 .setSmallIcon(R.drawable.ic_launcher_foreground)
                 .setPriority(NotificationCompat.PRIORITY_LOW)
+                .setOngoing(true)
                 .build();
     }
 
@@ -99,14 +105,20 @@ public class MyForegroundService extends Service {
 
     @Override
     public void onDestroy() {
-        super.onDestroy();
         handler.removeCallbacks(runnable);
+        isServiceRunning = false;
+        stopForeground(STOP_FOREGROUND_REMOVE);
+        super.onDestroy();
     }
 
     @Nullable
     @Override
     public IBinder onBind(Intent intent) {
         return null;
+    }
+
+    public static boolean isRunning(){
+        return isServiceRunning;
     }
 }
 
