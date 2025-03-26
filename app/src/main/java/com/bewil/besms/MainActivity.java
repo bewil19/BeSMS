@@ -6,7 +6,11 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.net.Uri;
 import android.os.Bundle;
+import android.os.PowerManager;
+import android.provider.Settings;
+import android.util.Log;
 import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -57,6 +61,21 @@ public class MainActivity extends AppCompatActivity {
         registerReceiver(logReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
 
         scheduleTask("MyWorker");
+
+        if(!isIgnoringBatteryOptimizations()){
+            requestBatteryOptimizationExemption();
+        }
+    }
+
+    private boolean isIgnoringBatteryOptimizations() {
+        PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
+        return pm.isIgnoringBatteryOptimizations(getPackageName());
+    }
+
+    private void requestBatteryOptimizationExemption(){
+        Intent intent = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
+        intent.setData(Uri.parse("package:" + getPackageName()));
+        startActivity(intent);
     }
 
     @Override
@@ -87,6 +106,10 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void scheduleTask(String tag){
+        cancelTask(tag);
+
+        Log.d("scheduleTask", "All tasks has been scheduled.");
+
         PeriodicWorkRequest periodicWorkRequest = new PeriodicWorkRequest.Builder(MyWorker.class, 20, TimeUnit.MINUTES)
             .addTag(tag)
             .setInitialDelay(20, TimeUnit.MINUTES)
@@ -96,6 +119,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void cancelTask(String tag){
+        Log.d("cancelTask", "All tasks has been cancelled.");
         WorkManager.getInstance(this).cancelAllWorkByTag(tag);
     }
 
