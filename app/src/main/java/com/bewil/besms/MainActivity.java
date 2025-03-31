@@ -60,7 +60,7 @@ public class MainActivity extends AppCompatActivity {
         IntentFilter filter = new IntentFilter("ServiceLogUpdate");
         registerReceiver(logReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
 
-        scheduleTask("MyWorker");
+        //scheduleTask("MyWorker");
 
         if(!isIgnoringBatteryOptimizations()){
             requestBatteryOptimizationExemption();
@@ -81,7 +81,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
-
+        startForegroundService();
     }
 
     private void clearLogs() {
