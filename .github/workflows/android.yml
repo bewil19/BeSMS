@@ -21,14 +21,17 @@ jobs:
 
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
+    - name: Set commit hash env variable
+      run: echo "COMMIT_HASH=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
     - name: Build with Gradle
       run: ./gradlew assembleDebug
     - name: Generate file name env var
       run: |
           DATE=$(date +'%d.%m.%Y.%H.%M')
           BRANCH_NAME=${GITHUB_REF##*/}
+          COMMIT_HASH=$(git rev-parse --short HEAD)
           MESSAGE=$(cat << EOF
-          BeSMS-debug-${BRANCH_NAME}-${DATE}
+          BeSMS-${BRANCH_NAME}-${DATE}-${COMMIT_HASH}
           EOF)
           echo OUTPUT_NAME=$MESSAGE >> $GITHUB_ENV
     - name: Rename APK

@@ -36,6 +36,9 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        Log.d("StartingBeSMS", BuildConfig.COMMIT_HASH);
+
         setContentView(R.layout.activity_main);
 
         Button btnStartService = findViewById(R.id.btnStartService);
@@ -60,7 +63,7 @@ public class MainActivity extends AppCompatActivity {
         IntentFilter filter = new IntentFilter("ServiceLogUpdate");
         registerReceiver(logReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
 
-        scheduleTask("MyWorker");
+        //scheduleTask("MyWorker");
 
         if(!isIgnoringBatteryOptimizations()){
             requestBatteryOptimizationExemption();
