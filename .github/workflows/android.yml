@@ -28,10 +28,9 @@ jobs:
     - name: Generate file name env var
       run: |
           DATE=$(date +'%d.%m.%Y.%H.%M')
-          BRANCH_NAME=${GITHUB_REF##*/}
           COMMIT_HASH=$(git rev-parse --short HEAD)
           MESSAGE=$(cat << EOF
-          BeSMS-${BRANCH_NAME}-${DATE}-${COMMIT_HASH}
+          BeSMS-${DATE}-${COMMIT_HASH}
           EOF)
           echo OUTPUT_NAME=$MESSAGE >> $GITHUB_ENV
     - name: Rename APK

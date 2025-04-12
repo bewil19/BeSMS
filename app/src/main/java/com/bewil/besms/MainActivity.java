@@ -7,26 +7,29 @@ import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
-import android.os.PowerManager;
 import android.provider.Settings;
+import android.telephony.SmsManager;
+import android.telephony.SubscriptionInfo;
+import android.telephony.SubscriptionManager;
 import android.util.Log;
-import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
-import androidx.work.PeriodicWorkRequest;
-import androidx.work.WorkManager;
 
-import java.util.concurrent.TimeUnit;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Random;
 
 public class MainActivity extends AppCompatActivity {
 
-    private static final int REQUEST_NOTIFICATION_PERMISSION = 1;
+    private static final int REQUEST_ALL_PERMISSIONS = 1001;
 
     private TextView tvElapsedTime;
     private static final String PREFS_NAME = "ServicePrefs";
@@ -41,21 +44,13 @@ public class MainActivity extends AppCompatActivity {
 
         setContentView(R.layout.activity_main);
 
-        Button btnStartService = findViewById(R.id.btnStartService);
-        Button btnStopService = findViewById(R.id.btnStopService);
-        Button btnClearLogs = findViewById(R.id.btnClearLogs);
+        checkAndRequestPermissions();
+
         tvElapsedTime = findViewById(R.id.tvElapsedTime);
 
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
-            != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this,
-                new String[]{Manifest.permission.POST_NOTIFICATIONS},
-                    REQUEST_NOTIFICATION_PERMISSION);
-        }
-
-        btnStartService.setOnClickListener(v -> startForegroundService());
-        btnStopService.setOnClickListener(v -> stopForegroundService());
-        btnClearLogs.setOnClickListener(view -> clearLogs());
+        findViewById(R.id.btnStartService).setOnClickListener(view -> startForegroundService());
+        findViewById(R.id.btnStopService).setOnClickListener(v -> stopForegroundService());
+        findViewById(R.id.btnClearLogs).setOnClickListener(view -> clearLogs());
 
         tvElapsedTime.setText(getStoredLogs());
 
@@ -63,28 +58,59 @@ public class MainActivity extends AppCompatActivity {
         IntentFilter filter = new IntentFilter("ServiceLogUpdate");
         registerReceiver(logReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
 
-        //scheduleTask("MyWorker");
-
-        if(!isIgnoringBatteryOptimizations()){
-            requestBatteryOptimizationExemption();
-        }
-    }
-
-    private boolean isIgnoringBatteryOptimizations() {
-        PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
-        return pm.isIgnoringBatteryOptimizations(getPackageName());
-    }
-
-    private void requestBatteryOptimizationExemption(){
-        Intent intent = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
-        intent.setData(Uri.parse("package:" + getPackageName()));
-        startActivity(intent);
+        //scheduleTask();
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        startForegroundService();
+        //startForegroundService();
+    }
+
+    private void checkAndRequestPermissions() {
+        List<String> permissionsToRequest = new ArrayList<>();
+        List<String> permissionsToExplain = new ArrayList<>();
+
+        String[] allPermissions = new String[]{
+                Manifest.permission.POST_NOTIFICATIONS,
+                Manifest.permission.READ_PHONE_STATE,
+                Manifest.permission.READ_PHONE_NUMBERS,
+                Manifest.permission.SEND_SMS
+        };
+
+        for (String permission : allPermissions) {
+            if (ContextCompat.checkSelfPermission(this, permission) != PackageManager.PERMISSION_GRANTED) {
+                permissionsToRequest.add(permission);
+
+                if (ActivityCompat.shouldShowRequestPermissionRationale(this, permission)) {
+                    permissionsToExplain.add(permission);
+                }
+            }
+        }
+
+        if (!permissionsToExplain.isEmpty()) {
+            showPermissionRationale(permissionsToRequest.toArray(new String[0]));
+        } else if (!permissionsToRequest.isEmpty()) {
+            ActivityCompat.requestPermissions(
+                    this,
+                    permissionsToRequest.toArray(new String[0]),
+                    REQUEST_ALL_PERMISSIONS
+            );
+        }
+    }
+
+    private void showPermissionRationale(String[] permissionsToRequest) {
+        new AlertDialog.Builder(this)
+                .setTitle("Permission Required")
+                .setMessage("This app needs SMS and phone permissions to function properly. Please grant them.")
+                .setPositiveButton("OK", (dialog, which) -> ActivityCompat.requestPermissions(
+                        this,
+                        permissionsToRequest,
+                        REQUEST_ALL_PERMISSIONS
+                ))
+                .setNegativeButton("Cancel", null)
+                .create()
+                .show();
     }
 
     private void clearLogs() {
@@ -94,6 +120,28 @@ public class MainActivity extends AppCompatActivity {
         editor.apply();
 
         tvElapsedTime.setText(getStoredLogs());
+        
+        sendTestText();
+    }
+    
+    private void sendTestText(){
+        SubscriptionManager subscriptionManager = getSystemService(SubscriptionManager.class);
+        List<SubscriptionInfo> subscriptionInfoList;
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) {
+            return;
+        }
+        subscriptionInfoList = subscriptionManager.getActiveSubscriptionInfoList();
+        for(int i = 0; i < subscriptionInfoList.size(); i++){
+            int id = subscriptionInfoList.get(i).getSubscriptionId();
+            sendSMS("+447516617538", "Hello from SIM " + id, id);
+            Random r = new Random();
+            Integer delay = r.nextInt(120000 - 30000) + 30000;
+            try {
+                Thread.sleep(delay);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+        }
     }
 
     private String getStoredLogs() {
@@ -104,27 +152,39 @@ public class MainActivity extends AppCompatActivity {
     private void startForegroundService() {
         if (!MyForegroundService.isRunning()) {
             Intent serviceIntent = new Intent(this, MyForegroundService.class);
-            startForegroundService(serviceIntent);
+            if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE){
+                // Android 14+
+                startForegroundService(serviceIntent);
+            } else {
+                // Android 13 and below
+                startService(serviceIntent);
+            }
         }
     }
 
-    private void scheduleTask(String tag){
-        cancelTask(tag);
+    public void sendSMS(String phoneNumber, String message, Integer simNumber){
+        SmsManager smsManager = getSystemService(SmsManager.class).createForSubscriptionId(simNumber);
+        //SmsManager smsManager = SmsManager.getSmsManagerForSubscriptionId(simNumber);
+        smsManager.sendTextMessage(phoneNumber, null, message, null, null, 0);
+    }
+
+    /*private void scheduleTask(){
+        cancelTask();
 
         Log.d("scheduleTask", "All tasks has been scheduled.");
 
         PeriodicWorkRequest periodicWorkRequest = new PeriodicWorkRequest.Builder(MyWorker.class, 20, TimeUnit.MINUTES)
-            .addTag(tag)
+            .addTag("MyWorker")
             .setInitialDelay(20, TimeUnit.MINUTES)
             .build();
 
         WorkManager.getInstance(this).enqueue(periodicWorkRequest);
     }
 
-    private void cancelTask(String tag){
+    private void cancelTask(){
         Log.d("cancelTask", "All tasks has been cancelled.");
-        WorkManager.getInstance(this).cancelAllWorkByTag(tag);
-    }
+        WorkManager.getInstance(this).cancelAllWorkByTag("MyWorker");
+    }*/
 
     private void stopForegroundService() {
         Intent serviceIntent = new Intent(this, MyForegroundService.class);
@@ -140,11 +200,33 @@ public class MainActivity extends AppCompatActivity {
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode == REQUEST_NOTIFICATION_PERMISSION) {
-            if (grantResults.length > 0 && grantResults[0] != PackageManager.PERMISSION_GRANTED) {
-                // Permission denied, handle accordingly (e.g., show a message)
-                Toast.makeText(this, "Notification permission is required to run the service", Toast.LENGTH_LONG).show();
+        if (requestCode == REQUEST_ALL_PERMISSIONS) {
+            for (int i = 0; i < permissions.length; i++) {
+                String permission = permissions[i];
+                if (grantResults[i] == PackageManager.PERMISSION_DENIED) {
+                    // Check if the user denied the permission permanently (Don't ask again)
+                    if (!ActivityCompat.shouldShowRequestPermissionRationale(this, permission)) {
+                        showSettingsDialog(permission);  // Show dialog to go to app settings
+                    }
+                }
             }
         }
+    }
+
+    private void showSettingsDialog(String permission) {
+        new AlertDialog.Builder(this)
+                .setTitle("Permission Denied")
+                .setMessage("This permission is required for the app to function. Please enable it in your device settings.")
+                .setPositiveButton("Go to Settings", (dialog, which) -> openAppSettings())
+                .setNegativeButton("Cancel", null)
+                .create()
+                .show();
+    }
+
+    private void openAppSettings() {
+        Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+        Uri uri = Uri.fromParts("package", getPackageName(), null);
+        intent.setData(uri);
+        startActivityForResult(intent, REQUEST_ALL_PERMISSIONS);
     }
 }

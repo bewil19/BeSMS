@@ -10,27 +10,27 @@
         android:id="@+id/btnStartService"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Start Service"/>
+        android:text="@string/start_service"/>
 
     <Button
         android:id="@+id/btnStopService"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Stop Service"
+        android:text="@string/stop_service"
         android:layout_marginTop="20dp"/>
 
     <Button
         android:id="@+id/btnClearLogs"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Clear Logs"
+        android:text="@string/clear_logs"
         android:layout_marginTop="20dp"/>
 
     <TextView
         android:id="@+id/tvElapsedTime"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Service Logs:"
+        android:text="@string/service_logs"
         android:textSize="16sp"
         android:layout_marginTop="20dp"
         android:maxLines="10"
