@@ -1,6 +1,8 @@
 package com.bewil.besms;
 
 import android.Manifest;
+import android.app.DownloadManager;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
@@ -10,31 +12,34 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
-import android.telephony.SmsManager;
-import android.telephony.SubscriptionInfo;
-import android.telephony.SubscriptionManager;
 import android.util.Log;
 import android.widget.TextView;
-import android.widget.Toast;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import androidx.core.content.FileProvider;
 
+import org.json.JSONObject;
+import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
 
 public class MainActivity extends AppCompatActivity {
 
-    private static final int REQUEST_ALL_PERMISSIONS = 1001;
+    private static final int REQUEST_ALL_PERMISSIONS = 1000;
+    public static final String apiUrl = "https://dev.benjamin-wilson.co.uk/api/";
+    private long downloadId;
 
     private TextView tvElapsedTime;
     private static final String PREFS_NAME = "ServicePrefs";
     private static final String LOGS_KEY = "serviceLogs";
     private LogReceiver logReceiver;
+    private ActivityResultLauncher<Intent> appSettingsLauncher;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -44,13 +49,17 @@ public class MainActivity extends AppCompatActivity {
 
         setContentView(R.layout.activity_main);
 
+        appSettingsLauncher = registerForActivityResult(
+            new ActivityResultContracts.StartActivityForResult(),
+            result -> checkAndRequestPermissions()
+        );
+
         checkAndRequestPermissions();
+        if(!BuildConfig.COMMIT_HASH.equals("unknown")) {
+            checkForUpdate();
+        }
 
         tvElapsedTime = findViewById(R.id.tvElapsedTime);
-
-        findViewById(R.id.btnStartService).setOnClickListener(view -> startForegroundService());
-        findViewById(R.id.btnStopService).setOnClickListener(v -> stopForegroundService());
-        findViewById(R.id.btnClearLogs).setOnClickListener(view -> clearLogs());
 
         tvElapsedTime.setText(getStoredLogs());
 
@@ -58,13 +67,13 @@ public class MainActivity extends AppCompatActivity {
         IntentFilter filter = new IntentFilter("ServiceLogUpdate");
         registerReceiver(logReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
 
-        //scheduleTask();
+        startForegroundService();
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        //startForegroundService();
+        startForegroundService();
     }
 
     private void checkAndRequestPermissions() {
@@ -113,6 +122,74 @@ public class MainActivity extends AppCompatActivity {
                 .show();
     }
 
+    private void checkForUpdate(){
+        new Thread(() -> {
+            try {
+                /*URL url = new URL(apiUrl + "version");
+                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                conn.connect();
+                BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+                StringBuilder sb = new StringBuilder();
+                String line;
+                while((line = reader.readLine()) != null) sb.append(line);*/
+
+                String result = UrlHelper.getPage(apiUrl + "version");
+
+                JSONObject json = new JSONObject(result);
+                String latestVersion = json.getString("versionName");
+                String apkUrl = json.getString("apkUrl");
+                if(!latestVersion.equals(BuildConfig.COMMIT_HASH)){
+                    runOnUiThread(() -> {
+                        new AlertDialog.Builder(this)
+                            .setTitle("Update Available")
+                            .setMessage("A new version is available. Would you like to update?")
+                            .setPositiveButton("Yes", (dialog, which) -> {
+                                downloadAndInstall(apkUrl);
+                            })
+                            .setNegativeButton("No", null)
+                            .setCancelable(true)
+                            .show();
+                    });
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }).start();
+    }
+
+    private void downloadAndInstall(String apkUrl){
+        File file = new File(getExternalFilesDir(null), "update.apk");
+        DownloadManager downloadManager = (DownloadManager) getSystemService(Context.DOWNLOAD_SERVICE);
+        DownloadManager.Request request = new DownloadManager.Request(Uri.parse(apkUrl));
+        request.setTitle("Downloading update");
+        request.setDescription("Please wait...");
+        request.setDestinationUri(Uri.fromFile(file));
+        request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+        downloadId = downloadManager.enqueue(request);
+
+        BroadcastReceiver receiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                long completedDownloadId = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1);
+                if (completedDownloadId == downloadId) {
+                    unregisterReceiver(this);
+
+                    try {
+                        Uri apkUri = FileProvider.getUriForFile(context, getPackageName() + ".provider", file);
+                        Intent installIntent = new Intent(Intent.ACTION_VIEW);
+                        installIntent.setDataAndType(apkUri, "application/vnd.android.package-archive");
+                        installIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
+                        startActivity(installIntent);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+        };
+
+        registerReceiver(receiver, new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE), RECEIVER_EXPORTED);
+    }
+
     private void clearLogs() {
         SharedPreferences sharedPreferences = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         SharedPreferences.Editor editor = sharedPreferences.edit();
@@ -120,28 +197,6 @@ public class MainActivity extends AppCompatActivity {
         editor.apply();
 
         tvElapsedTime.setText(getStoredLogs());
-        
-        sendTestText();
-    }
-    
-    private void sendTestText(){
-        SubscriptionManager subscriptionManager = getSystemService(SubscriptionManager.class);
-        List<SubscriptionInfo> subscriptionInfoList;
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) {
-            return;
-        }
-        subscriptionInfoList = subscriptionManager.getActiveSubscriptionInfoList();
-        for(int i = 0; i < subscriptionInfoList.size(); i++){
-            int id = subscriptionInfoList.get(i).getSubscriptionId();
-            sendSMS("+447516617538", "Hello from SIM " + id, id);
-            Random r = new Random();
-            Integer delay = r.nextInt(120000 - 30000) + 30000;
-            try {
-                Thread.sleep(delay);
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
-            }
-        }
     }
 
     private String getStoredLogs() {
@@ -151,6 +206,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void startForegroundService() {
         if (!MyForegroundService.isRunning()) {
+            clearLogs();
             Intent serviceIntent = new Intent(this, MyForegroundService.class);
             if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE){
                 // Android 14+
@@ -161,30 +217,6 @@ public class MainActivity extends AppCompatActivity {
             }
         }
     }
-
-    public void sendSMS(String phoneNumber, String message, Integer simNumber){
-        SmsManager smsManager = getSystemService(SmsManager.class).createForSubscriptionId(simNumber);
-        //SmsManager smsManager = SmsManager.getSmsManagerForSubscriptionId(simNumber);
-        smsManager.sendTextMessage(phoneNumber, null, message, null, null, 0);
-    }
-
-    /*private void scheduleTask(){
-        cancelTask();
-
-        Log.d("scheduleTask", "All tasks has been scheduled.");
-
-        PeriodicWorkRequest periodicWorkRequest = new PeriodicWorkRequest.Builder(MyWorker.class, 20, TimeUnit.MINUTES)
-            .addTag("MyWorker")
-            .setInitialDelay(20, TimeUnit.MINUTES)
-            .build();
-
-        WorkManager.getInstance(this).enqueue(periodicWorkRequest);
-    }
-
-    private void cancelTask(){
-        Log.d("cancelTask", "All tasks has been cancelled.");
-        WorkManager.getInstance(this).cancelAllWorkByTag("MyWorker");
-    }*/
 
     private void stopForegroundService() {
         Intent serviceIntent = new Intent(this, MyForegroundService.class);
@@ -213,10 +245,21 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    private String getPermissionFriendlyName(String permission) {
+        return switch (permission) {
+            case Manifest.permission.CAMERA -> "Camera";
+            case Manifest.permission.ACCESS_FINE_LOCATION -> "Location";
+            case Manifest.permission.READ_CONTACTS -> "Contacts";
+            default -> permission; // fallback to raw string
+        };
+    }
+
     private void showSettingsDialog(String permission) {
+        String permissionName = getPermissionFriendlyName(permission);
+
         new AlertDialog.Builder(this)
                 .setTitle("Permission Denied")
-                .setMessage("This permission is required for the app to function. Please enable it in your device settings.")
+                .setMessage(permissionName + " permission is required for the app to function. Please enable it in your device settings.")
                 .setPositiveButton("Go to Settings", (dialog, which) -> openAppSettings())
                 .setNegativeButton("Cancel", null)
                 .create()
@@ -227,6 +270,7 @@ public class MainActivity extends AppCompatActivity {
         Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
         Uri uri = Uri.fromParts("package", getPackageName(), null);
         intent.setData(uri);
-        startActivityForResult(intent, REQUEST_ALL_PERMISSIONS);
+        //startActivityForResult(intent, REQUEST_ALL_PERMISSIONS);
+        appSettingsLauncher.launch(intent);
     }
 }

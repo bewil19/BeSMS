@@ -8,15 +8,29 @@ import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
+import android.telephony.SubscriptionInfo;
+import android.telephony.SubscriptionManager;
 
 import androidx.annotation.Nullable;
+import androidx.core.app.ActivityCompat;
 import androidx.core.app.NotificationCompat;
+
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 import java.util.Locale;
+import java.util.Random;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class MyForegroundService extends Service {
 
@@ -27,33 +41,139 @@ public class MyForegroundService extends Service {
 
     private Handler handler;
     private Runnable runnable;
-    private long startTime;
 
     private static boolean isServiceRunning = false;
+    private ArrayList<String[]> arrayList = new ArrayList<>();
+    private String expireDate;
 
     @Override
     public void onCreate() {
         super.onCreate();
         isServiceRunning = true;
-        startTime = System.currentTimeMillis();
         createNotificationChannel();
 
         handler = new Handler(Looper.getMainLooper());
         runnable = new Runnable() {
             @Override
             public void run() {
-                long elapsedTime = (System.currentTimeMillis() - startTime) / 1000;
-                String currentTime = new SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(new Date());
-                String logEntry = currentTime + " - Elapsed: " + elapsedTime + " sec";
+                //String currentTime = new SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(new Date());
 
-                saveLog(logEntry);
-                updateNotification(logEntry);
-                sendUpdateToActivity();
+                Random r = new Random();
+                int delay = r.nextInt(120000 - 30000) + 30000;
 
-                handler.postDelayed(this, 5000); // Repeat every 5 sec
+                if(arrayList.isEmpty()){ //|| !currentDate().equals(expireDate)){
+                    /*getSMS();
+                    if(arrayList.isEmpty()){
+                        delay = r.nextInt((2 * 60 * 60 * 1000) - (60 * 60 * 1000)) + (60 * 60 * 1000);
+                        int hours = delay / (60 * 60 * 1000);
+                        int minutes = (delay % (60 * 60 * 1000)) / (60 * 1000);
+                        saveLog("Wait for " + hours + " hour(s) and " + minutes + " minute(s)");
+                        updateNotification("Wait for " + hours + " hour(s) and " + minutes + " minute(s)");
+                        sendUpdateToActivity();
+                        handler.postDelayed(this, delay);
+                    } else {
+                        saveLog("Wait for 5 seconds");
+                        updateNotification("Wait for 5 seconds");
+                        sendUpdateToActivity();
+                        handler.postDelayed(this, (5 * 1000)); // Repeat every 5 sec
+                    }*/
+
+                    ExecutorService executor = Executors.newSingleThreadExecutor();
+
+                    executor.execute(() -> {
+                        getSMS();
+
+                        handler.post(() -> {
+                            if (arrayList.isEmpty()){ //|| !currentDate().equals(expireDate)) {
+                                int delay2 = r.nextInt((2 * 60 * 60 * 1000) - (60 * 60 * 1000)) + (60 * 60 * 1000);
+                                int hours = delay2 / (60 * 60 * 1000);
+                                int minutes = (delay2 % (60 * 60 * 1000)) / (60 * 1000);
+                                saveLog("Wait for " + hours + " hour(s) and " + minutes + " minute(s)");
+                                updateNotification("Wait for " + hours + " hour(s) and " + minutes + " minute(s)");
+                                sendUpdateToActivity();
+                                handler.postDelayed(runnable, delay2);
+                            } else {
+                                saveLog("Wait for 5 seconds");
+                                updateNotification("Wait for 5 seconds");
+                                sendUpdateToActivity();
+                                handler.postDelayed(runnable, 5000);
+                            }
+                        });
+                    });
+                } else {
+                    String[] sms = arrayList.get(0);
+                    String phoneNo = sms[0];
+                    String message = sms[1];
+                    int simNo = Integer.parseInt(sms[2]);
+                    SmsHelper.sendSMS(getApplicationContext(), phoneNo, message, simNo);
+                    saveLog("Sent SMS (" + arrayList.size() + ")...");
+                    updateNotification("Sent SMS (" + arrayList.size() + ")...");
+                    sendUpdateToActivity();
+                    saveLog("Wait for " + delay);
+                    sendUpdateToActivity();
+                    arrayList.remove(0);
+                    handler.postDelayed(this, delay);
+                }
             }
         };
         handler.post(runnable);
+    }
+
+    private void getSMS(){
+        arrayList.clear();
+
+        SubscriptionManager subscriptionManager = getSystemService(SubscriptionManager.class);
+	    if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) {
+		    return;
+	    }
+
+	    List<SubscriptionInfo> subscriptionInfoList = subscriptionManager.getActiveSubscriptionInfoList();
+        if(subscriptionInfoList == null || subscriptionInfoList.isEmpty()){
+            return;
+        }
+        for(int i = 0; i < subscriptionInfoList.size(); i++){
+            int id = subscriptionInfoList.get(i).getSubscriptionId();
+            String phoneNumber = subscriptionManager.getPhoneNumber(id);
+            phoneNumber = phoneNumber.replace("+", "");
+            saveLog("Getting SMS for " + phoneNumber + " ...");
+            sendUpdateToActivity();
+
+            getSMSFor(phoneNumber, id);
+        }
+
+        saveLog("Found " + arrayList.size() + " SMS to send.");
+        sendUpdateToActivity();
+    }
+
+    private void getSMSFor(String simNumber, int simID){
+        String result = UrlHelper.getPage(MainActivity.apiUrl + "getsms/" + simNumber);
+        try{
+            JSONObject jsonObject = new JSONObject(result);
+            JSONObject jResult = jsonObject.getJSONObject("result");
+            JSONObject meta = jResult.getJSONObject("meta");
+            String phoneId = meta.getString("id");
+            JSONObject sms = jResult.getJSONObject("sms");
+            JSONObject phoneObj = sms.getJSONObject(phoneId);
+            JSONArray phoneSms = phoneObj.getJSONArray("sms");
+            int i = 0;
+            while(i < phoneSms.length()){
+                JSONObject row = phoneSms.getJSONObject(i);
+                String phoneNumber = row.getString("ddi_label");
+                String message = row.getString("sms");
+                expireDate = row.getString("date");
+                try{
+                    String[] myStringArray = {phoneNumber, message, String.valueOf(simID)};
+                    arrayList.add(myStringArray);
+                    i++;
+                } catch (Exception ignored) {
+                }
+            }
+        } catch (JSONException ignored) {
+        }
+    }
+
+    private String currentDate(){
+	    return new SimpleDateFormat("y-MM-dd", Locale.getDefault()).format(new Date());
     }
 
     @Override
