@@ -55,9 +55,7 @@ public class MainActivity extends AppCompatActivity {
         );
 
         checkAndRequestPermissions();
-        if(!BuildConfig.COMMIT_HASH.equals("unknown")) {
-            checkForUpdate();
-        }
+        checkForUpdate();
 
         tvElapsedTime = findViewById(R.id.tvElapsedTime);
 
@@ -125,14 +123,6 @@ public class MainActivity extends AppCompatActivity {
     private void checkForUpdate(){
         new Thread(() -> {
             try {
-                /*URL url = new URL(apiUrl + "version");
-                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                conn.connect();
-                BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
-                StringBuilder sb = new StringBuilder();
-                String line;
-                while((line = reader.readLine()) != null) sb.append(line);*/
-
                 String result = UrlHelper.getPage(apiUrl + "version");
 
                 JSONObject json = new JSONObject(result);
@@ -151,8 +141,7 @@ public class MainActivity extends AppCompatActivity {
                             .show();
                     });
                 }
-            } catch (Exception e) {
-                e.printStackTrace();
+            } catch (Exception ignored) {
             }
         }).start();
     }
@@ -180,8 +169,7 @@ public class MainActivity extends AppCompatActivity {
                         installIntent.setDataAndType(apkUri, "application/vnd.android.package-archive");
                         installIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
                         startActivity(installIntent);
-                    } catch (Exception e) {
-                        e.printStackTrace();
+                    } catch (Exception ignored) {
                     }
                 }
             }

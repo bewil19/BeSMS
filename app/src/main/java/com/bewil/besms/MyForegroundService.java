@@ -43,7 +43,7 @@ public class MyForegroundService extends Service {
     private Runnable runnable;
 
     private static boolean isServiceRunning = false;
-    private ArrayList<String[]> arrayList = new ArrayList<>();
+    private final ArrayList<String[]> arrayList = new ArrayList<>();
     private String expireDate;
 
     @Override
@@ -62,21 +62,6 @@ public class MyForegroundService extends Service {
                 int delay = r.nextInt(120000 - 30000) + 30000;
 
                 if(arrayList.isEmpty()){ //|| !currentDate().equals(expireDate)){
-                    /*getSMS();
-                    if(arrayList.isEmpty()){
-                        delay = r.nextInt((2 * 60 * 60 * 1000) - (60 * 60 * 1000)) + (60 * 60 * 1000);
-                        int hours = delay / (60 * 60 * 1000);
-                        int minutes = (delay % (60 * 60 * 1000)) / (60 * 1000);
-                        saveLog("Wait for " + hours + " hour(s) and " + minutes + " minute(s)");
-                        updateNotification("Wait for " + hours + " hour(s) and " + minutes + " minute(s)");
-                        sendUpdateToActivity();
-                        handler.postDelayed(this, delay);
-                    } else {
-                        saveLog("Wait for 5 seconds");
-                        updateNotification("Wait for 5 seconds");
-                        sendUpdateToActivity();
-                        handler.postDelayed(this, (5 * 1000)); // Repeat every 5 sec
-                    }*/
 
                     ExecutorService executor = Executors.newSingleThreadExecutor();
 
@@ -187,7 +172,7 @@ public class MyForegroundService extends Service {
         SharedPreferences sharedPreferences = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         String existingLogs = sharedPreferences.getString(LOGS_KEY, "");
         SharedPreferences.Editor editor = sharedPreferences.edit();
-        editor.putString(LOGS_KEY, logEntry + "\n" + existingLogs);
+        editor.putString(LOGS_KEY, currentDate() + logEntry + "\n" + existingLogs);
         editor.apply();
     }
 
@@ -203,7 +188,7 @@ public class MyForegroundService extends Service {
 
     private void updateNotification(String logEntry) {
         NotificationManager manager = getSystemService(NotificationManager.class);
-        manager.notify(NOTIFICATION_ID, getNotification(logEntry));
+        manager.notify(NOTIFICATION_ID, getNotification(currentDate() + logEntry));
     }
 
     private Notification getNotification(String text) {

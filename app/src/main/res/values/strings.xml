@@ -1,8 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="start_service">Start Service</string>
-    <string name="stop_service">Stop Service</string>
-    <string name="clear_logs">Clear Logs</string>
     <string name="service_logs">Service Logs:</string>
     <string name="app_name">BeSMS</string>
 </resources>
