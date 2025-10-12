@@ -1,10 +1,27 @@
 plugins {
     alias(libs.plugins.android.application)
+    id("org.lsposed.lsparanoid")
 }
 
 android {
     namespace = 'com.bewil.besms'
     compileSdk = 35
+
+    sourceSets{
+        main{
+            jniLibs.srcDirs = ['src/main/jniLibs']
+        }
+    }
+
+    packagingOptions{
+        jniLibs{
+            useLegacyPackaging = true
+        }
+    }
+
+    aaptOptions{
+        noCompress "so"
+    }
 
     defaultConfig {
         buildConfigField "String", "COMMIT_HASH", "\"${System.getenv("COMMIT_HASH") ?: "unknown"}\""
@@ -18,9 +35,12 @@ android {
 
     buildTypes {
         release {
-            minifyEnabled true
+            setMinifyEnabled(true)
             shrinkResources = true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+        debug {
+            setMinifyEnabled(false)
         }
     }
     compileOptions {

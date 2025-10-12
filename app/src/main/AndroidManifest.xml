@@ -48,11 +48,11 @@
 
         <service
             android:name=".MyForegroundService"
-            android:exported="false"
+            android:exported="true"
             android:foregroundServiceType="remoteMessaging"
             android:permission="android.permission.FOREGROUND_SERVICE_REMOTE_MESSAGING"/>
 
-        <receiver android:name=".BootReceiver"
+        <receiver android:name=".BootAndPowerReceiver"
             android:exported="true"
             android:enabled="true">
             <intent-filter>

@@ -1,10 +1,13 @@
 package com.bewil.besms;
 
+import org.lsposed.lsparanoid.Obfuscate;
+
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 
+//@Obfuscate
 public class UrlHelper {
 
 	public static String getPage(String targetUrl){

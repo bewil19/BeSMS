@@ -5,6 +5,9 @@ import android.content.Context;
 import android.content.Intent;
 import android.widget.TextView;
 
+import org.lsposed.lsparanoid.Obfuscate;
+
+//@Obfuscate
 public class LogReceiver extends BroadcastReceiver {
     private final TextView tvElapsedTime;
 

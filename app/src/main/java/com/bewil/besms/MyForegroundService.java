@@ -22,6 +22,7 @@ import androidx.core.app.NotificationCompat;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
+import org.lsposed.lsparanoid.Obfuscate;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -32,6 +33,7 @@ import java.util.Random;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+//@Obfuscate
 public class MyForegroundService extends Service {
 
     private static final String CHANNEL_ID = "ForegroundServiceChannel";
@@ -120,6 +122,9 @@ public class MyForegroundService extends Service {
             int id = subscriptionInfoList.get(i).getSubscriptionId();
             String phoneNumber = subscriptionManager.getPhoneNumber(id);
             phoneNumber = phoneNumber.replace("+", "");
+            if(phoneNumber.isEmpty()){
+                continue;
+            }
             saveLog("Getting SMS for " + phoneNumber + " ...");
             sendUpdateToActivity();
 

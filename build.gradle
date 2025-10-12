@@ -1,4 +1,22 @@
 // Top-level build file where you can add configuration options common to all sub-projects/modules.
+
+buildscript {
+    repositories {
+        google {
+            content {
+                includeGroupByRegex("com\\.android.*")
+                includeGroupByRegex("com\\.google.*")
+                includeGroupByRegex("androidx.*")
+            }
+        }
+        mavenCentral()
+        gradlePluginPortal()
+    }
+    dependencies {
+        classpath('org.lsposed.lsparanoid:gradle-plugin:0.6.0')
+    }
+}
+
 plugins {
 alias(libs.plugins.android.application) apply false
 }

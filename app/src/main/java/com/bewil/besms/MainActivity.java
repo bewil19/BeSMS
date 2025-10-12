@@ -25,10 +25,13 @@ import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
 
 import org.json.JSONObject;
+import org.lsposed.lsparanoid.Obfuscate;
+
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
+//@Obfuscate
 public class MainActivity extends AppCompatActivity {
 
     private static final int REQUEST_ALL_PERMISSIONS = 1000;

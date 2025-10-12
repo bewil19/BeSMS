@@ -5,11 +5,19 @@ import android.content.Context;
 import android.content.Intent;
 import android.os.Build;
 
-public class BootReceiver extends BroadcastReceiver {
+import org.lsposed.lsparanoid.Obfuscate;
+
+//@Obfuscate
+public class BootAndPowerReceiver extends BroadcastReceiver {
 
     @Override
     public void onReceive(Context context, Intent intent) {
-        if(Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction()) && !MyForegroundService.isRunning()){
+        String action = intent.getAction();
+
+        if(Intent.ACTION_BOOT_COMPLETED.equals(action) ||
+                Intent.ACTION_POWER_CONNECTED.equals(action) &&
+                !MyForegroundService.isRunning()){
+
             Intent serviceIntent = new Intent(context, MyForegroundService.class);
             if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE){
                 // Android 14+

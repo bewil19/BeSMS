@@ -24,7 +24,7 @@ jobs:
     - name: Set commit hash env variable
       run: echo "COMMIT_HASH=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
     - name: Build with Gradle
-      run: ./gradlew :app:assembleDebug --warning-mode all
+      run: ./gradlew :app:assembleDebug
     - name: Generate file name env var
       run: |
           DATE=$(date +'%d.%m.%Y.%H.%M')
